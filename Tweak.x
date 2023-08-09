@@ -1,8 +1,9 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
 #import <Foundation/NSUserDefaults+Private.h>
-#include <unistd.h>
-#include <substrate.h>
+#import <unistd.h>
+#import <rootless.h>
+#import <substrate.h>
 
 extern char **environ;
 
@@ -16,11 +17,14 @@ static BOOL isRootUser;
 
 static void reloadSettings() {
 	NSDictionary *settings = [NSDictionary dictionaryWithContentsOfFile:@"/private/var/mobile/Library/Preferences/com.byteage.xcoderootdebug.plist"];
+	if (!settings) {
+		settings = [NSDictionary dictionaryWithContentsOfFile:@"/var/jb/var/mobile/Library/Preferences/com.byteage.xcoderootdebug.plist"];
+	}
 	NSNumber * enabledValue = (NSNumber *)[settings objectForKey:@"enabled"];
 	enabled = (enabledValue)? [enabledValue boolValue] : YES;
 	debugserverPath = [settings objectForKey:@"debugserverPath"];
-	if(!debugserverPath.length) {
-		debugserverPath = @"/usr/bin/debugserver";
+	if (!debugserverPath.length) {
+		debugserverPath = ROOT_PATH_NS("/usr/bin/debugserver");
 	}
 	NSNumber * isRootUserValue = (NSNumber *)[settings objectForKey:@"isRootUser"];
 	isRootUser = (isRootUserValue)? [isRootUserValue boolValue] : YES;
