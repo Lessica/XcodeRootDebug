@@ -1,6 +1,6 @@
+PACKAGE_VERSION := 0.0.2
 ARCHS := arm64 arm64e
-
-TARGET := iphone:clang:14.5:9.0
+TARGET := iphone:clang:16.5:14.0
 INSTALL_TARGET_PROCESSES := lockdownd
 
 include $(THEOS)/makefiles/common.mk
