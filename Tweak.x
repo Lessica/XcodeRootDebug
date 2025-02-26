@@ -4,6 +4,7 @@
 
 #import <unistd.h>
 #import <substrate.h>
+#import <rootless.h>
 
 #if THEOS_PACKAGE_SCHEME_ROOTHIDE
 #import <roothide.h>
@@ -24,7 +25,7 @@ static void reloadSettings() {
 #if THEOS_PACKAGE_SCHEME_ROOTHIDE
     settingsPath = jbroot(@"/var/mobile/Library/Preferences/com.byteage.xcoderootdebug.plist");
 #else
-    settingsPath = @"/var/mobile/Library/Preferences/com.byteage.xcoderootdebug.plist";
+    settingsPath = ROOT_PATH_NS(@"/var/mobile/Library/Preferences/com.byteage.xcoderootdebug.plist");
 #endif
     NSDictionary *settings = [NSDictionary dictionaryWithContentsOfFile:settingsPath];
     NSNumber * enabledValue = (NSNumber *)[settings objectForKey:@"enabled"];
