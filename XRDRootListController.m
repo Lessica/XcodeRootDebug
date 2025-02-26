@@ -1,15 +1,14 @@
 #import <Foundation/Foundation.h>
 #import "XRDRootListController.h"
-#include <notify.h>
+#import <notify.h>
 
 @implementation XRDRootListController
 
 - (NSArray *)specifiers {
-	if (!_specifiers) {
-		_specifiers = [self loadSpecifiersFromPlistName:@"Root" target:self];
-	}
-
-	return _specifiers;
+    if (!_specifiers) {
+        _specifiers = [self loadSpecifiersFromPlistName:@"Root" target:self];
+    }
+    return _specifiers;
 }
 
 - (void)saveSetting {

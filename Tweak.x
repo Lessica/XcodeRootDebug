@@ -1,8 +1,13 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
 #import <Foundation/NSUserDefaults+Private.h>
-#include <unistd.h>
-#include <substrate.h>
+
+#import <unistd.h>
+#import <substrate.h>
+
+#if THEOS_PACKAGE_SCHEME_ROOTHIDE
+#import <roothide.h>
+#endif
 
 extern char **environ;
 
@@ -15,20 +20,30 @@ static NSString *debugserverPath;
 static BOOL isRootUser;
 
 static void reloadSettings() {
-	NSDictionary *settings = [NSDictionary dictionaryWithContentsOfFile:@"/private/var/mobile/Library/Preferences/com.byteage.xcoderootdebug.plist"];
-	NSNumber * enabledValue = (NSNumber *)[settings objectForKey:@"enabled"];
-	enabled = (enabledValue)? [enabledValue boolValue] : YES;
-	debugserverPath = [settings objectForKey:@"debugserverPath"];
-	if(!debugserverPath.length) {
-		debugserverPath = @"/usr/bin/debugserver";
-	}
-	NSNumber * isRootUserValue = (NSNumber *)[settings objectForKey:@"isRootUser"];
-	isRootUser = (isRootUserValue)? [isRootUserValue boolValue] : YES;
+    NSString *settingsPath;
+#if THEOS_PACKAGE_SCHEME_ROOTHIDE
+    settingsPath = jbroot(@"/var/mobile/Library/Preferences/com.byteage.xcoderootdebug.plist");
+#else
+    settingsPath = @"/var/mobile/Library/Preferences/com.byteage.xcoderootdebug.plist";
+#endif
+    NSDictionary *settings = [NSDictionary dictionaryWithContentsOfFile:settingsPath];
+    NSNumber * enabledValue = (NSNumber *)[settings objectForKey:@"enabled"];
+    enabled = (enabledValue)? [enabledValue boolValue] : YES;
+    debugserverPath = [settings objectForKey:@"debugserverPath"];
+    if (!debugserverPath.length) {
+        debugserverPath = @"/usr/bin/debugserver";
+    } else {
+#if THEOS_PACKAGE_SCHEME_ROOTHIDE
+        debugserverPath = jbroot(debugserverPath);
+#endif
+    }
+    NSNumber * isRootUserValue = (NSNumber *)[settings objectForKey:@"isRootUser"];
+    isRootUser = (isRootUserValue)? [isRootUserValue boolValue] : YES;
 }
 
 static void notificationCallback(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
-	// kill self
-	exit(0);
+    // kill self
+    exit(0);
 }
 
 // If the compiler understands __arm64e__, assume it's paired with an SDK that has
@@ -65,50 +80,50 @@ bool (*original_SMJobSubmit)(CFStringRef domain, CFDictionaryRef job, Authorizat
 static NSString *systemDebugserverPath;
 
 bool hooked_SMJobSubmit(CFStringRef domain, CFDictionaryRef job, AuthorizationRef auth, CFErrorRef _Nullable *error) {
-	LOG(@"Enter hooked_SMJobSubmit %@", job);
-	NSMutableDictionary *newJobInfo = [NSMutableDictionary dictionaryWithDictionary:(__bridge NSDictionary *)job];
-	NSMutableArray *programArgs = [newJobInfo[@"ProgramArguments"] mutableCopy];
-	NSString *program = programArgs[0];
-	if (enabled) {
-		if([program isEqualToString:@"/Developer/usr/bin/debugserver"] || [program isEqualToString:@"/usr/libexec/debugserver"]) {
-			LOG("Found launch %@", program);
-			systemDebugserverPath = [program copy];
-			if(debugserverPath.length > 0 && access(debugserverPath.UTF8String, F_OK) == 0){
-				LOG("Change to launch %@", debugserverPath);
-				programArgs[0] = debugserverPath;
-				newJobInfo[@"ProgramArguments"] = programArgs;
-			} else {
-				LOG("Debug Server does not exist at %@", debugserverPath);
-			}
-			if(isRootUser) {
-				LOG("Change to launch with root");
-				newJobInfo[@"UserName"] = @"root";
-			} else {
-				newJobInfo[@"UserName"] = @"mobile";
-			}
-			LOG(@"Now SMJobSubmit %@", newJobInfo);
-		} else if([program isEqualToString:debugserverPath]) {
-			LOG("Found launch %@",debugserverPath);
-			if(isRootUser) {
-				LOG("Change to launch with root");
-				newJobInfo[@"UserName"] = @"root";
-			} else {
-				newJobInfo[@"UserName"] = @"mobile";
-			}
-			LOG(@"Now SMJobSubmit %@", newJobInfo);
-		}
-	} else {
-		if([program isEqualToString:debugserverPath]) {
-			LOG("Found launch %@", debugserverPath);
-			LOG("Restore launch system debugserver at %@ with mobile", systemDebugserverPath);
-			programArgs[0] = systemDebugserverPath;
-			newJobInfo[@"ProgramArguments"] = programArgs;
-			newJobInfo[@"UserName"] = @"mobile";
-			LOG(@"Now SMJobSubmit %@", newJobInfo);
-		}
-	}
-	LOG(@"New SMJobSubmit %@", newJobInfo);
-	return original_SMJobSubmit(domain, (__bridge CFDictionaryRef)newJobInfo, auth, error);
+    LOG(@"Enter hooked_SMJobSubmit %@", job);
+    NSMutableDictionary *newJobInfo = [NSMutableDictionary dictionaryWithDictionary:(__bridge NSDictionary *)job];
+    NSMutableArray *programArgs = [newJobInfo[@"ProgramArguments"] mutableCopy];
+    NSString *program = programArgs[0];
+    if (enabled) {
+        if ([program isEqualToString:@"/Developer/usr/bin/debugserver"] || [program isEqualToString:@"/usr/libexec/debugserver"]) {
+            LOG("Found launch %@", program);
+            systemDebugserverPath = [program copy];
+            if (debugserverPath.length > 0 && access(debugserverPath.UTF8String, F_OK) == 0){
+                LOG("Change to launch %@", debugserverPath);
+                programArgs[0] = debugserverPath;
+                newJobInfo[@"ProgramArguments"] = programArgs;
+            } else {
+                LOG("Debug Server does not exist at %@", debugserverPath);
+            }
+            if (isRootUser) {
+                LOG("Change to launch with root");
+                newJobInfo[@"UserName"] = @"root";
+            } else {
+                newJobInfo[@"UserName"] = @"mobile";
+            }
+            LOG(@"Now SMJobSubmit %@", newJobInfo);
+        } else if ([program isEqualToString:debugserverPath]) {
+            LOG("Found launch %@",debugserverPath);
+            if (isRootUser) {
+                LOG("Change to launch with root");
+                newJobInfo[@"UserName"] = @"root";
+            } else {
+                newJobInfo[@"UserName"] = @"mobile";
+            }
+            LOG(@"Now SMJobSubmit %@", newJobInfo);
+        }
+    } else {
+        if ([program isEqualToString:debugserverPath]) {
+            LOG("Found launch %@", debugserverPath);
+            LOG("Restore launch system debugserver at %@ with mobile", systemDebugserverPath);
+            programArgs[0] = systemDebugserverPath;
+            newJobInfo[@"ProgramArguments"] = programArgs;
+            newJobInfo[@"UserName"] = @"mobile";
+            LOG(@"Now SMJobSubmit %@", newJobInfo);
+        }
+    }
+    LOG(@"New SMJobSubmit %@", newJobInfo);
+    return original_SMJobSubmit(domain, (__bridge CFDictionaryRef)newJobInfo, auth, error);
 }
 
 %ctor {
